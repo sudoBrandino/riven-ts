@@ -2,12 +2,15 @@ import { MediaItem } from "@repo/util-plugin-sdk/dto/entities";
 import { MediaItemType } from "@repo/util-plugin-sdk/dto/enums/media-item-type.enum";
 import { MediaItemUnion } from "@repo/util-plugin-sdk/dto/unions/media-item.union";
 
-import { type FilterQuery, sql } from "@mikro-orm/core";
+import { type FilterQuery, QueryOrder, sql } from "@mikro-orm/core";
 import { Arg, FieldResolver, ID, Int, Query, Resolver } from "type-graphql";
 
 import { CoreContext } from "../decorators/core-context.ts";
+import { MediaItemOrderField } from "../enums/media-item-order-field.enum.ts";
+import { OrderDirection } from "../enums/order-direction.enum.ts";
 import { LibraryCounts } from "../types/library-counts.type.ts";
 
+import type { QueryOrderMap } from "@mikro-orm/core";
 import type { UUID } from "node:crypto";
 
 /** Hard upper bound on `mediaItems(limit)` to keep abusive payloads bounded. */
@@ -28,7 +31,7 @@ export class MediaItemResolver {
 
   @Query(() => [MediaItem], {
     description:
-      "Lists media items with optional search, type filter, and pagination.",
+      "Lists media items with optional search, type filter, sorting, and pagination.",
   })
   mediaItems(
     @CoreContext() { em }: CoreContext,
@@ -53,6 +56,18 @@ export class MediaItemResolver {
       description: "Restrict results to a single MediaItem subtype.",
     })
     type: MediaItemType | null = null,
+    @Arg("orderBy", () => MediaItemOrderField.enum, {
+      nullable: true,
+      description:
+        "Column to sort by. When omitted the underlying database order is preserved (insertion order for SQLite, unspecified for Postgres).",
+    })
+    orderBy: MediaItemOrderField | null = null,
+    @Arg("orderDirection", () => OrderDirection.enum, {
+      nullable: true,
+      description:
+        "Sort direction. Ignored when `orderBy` is null. Defaults to `ASC` if `orderBy` is set without a direction.",
+    })
+    orderDirection: OrderDirection | null = null,
   ): Promise<MediaItem[]> {
     const clampedLimit = Math.min(
       Math.max(1, Math.trunc(limit)),
@@ -76,9 +91,22 @@ export class MediaItemResolver {
       };
     }
 
+    // Translate the GraphQL enum pair into a mikro-orm `QueryOrderMap`. When
+    // the caller omits `orderBy` we pass `undefined`, which preserves the
+    // historical behavior (no ORDER BY in the emitted SQL).
+    const order: QueryOrderMap<MediaItem> | undefined = orderBy
+      ? {
+          [orderBy]:
+            orderDirection === OrderDirection.enum.DESC
+              ? QueryOrder.DESC
+              : QueryOrder.ASC,
+        }
+      : undefined;
+
     return em.find(MediaItem, where as FilterQuery<MediaItem>, {
       limit: clampedLimit,
       offset: clampedOffset,
+      orderBy: order,
       overfetch: true,
     });
   }

@@ -3,6 +3,8 @@ import { MediaItemType } from "@repo/util-plugin-sdk/dto/enums/media-item-type.e
 import { expect } from "vitest";
 
 import { it } from "../../__tests__/test-context.ts";
+import { MediaItemOrderField } from "../enums/media-item-order-field.enum.ts";
+import { OrderDirection } from "../enums/order-direction.enum.ts";
 import { MediaItemResolver } from "./media-item.resolver.ts";
 
 import type { CoreContext } from "../decorators/core-context.ts";
@@ -225,4 +227,103 @@ it("mediaItemById uses the existing find path unchanged", async ({
   );
 
   expect(result.id).toBe(indexedMovie.id);
+});
+
+it("mediaItems orders by title ASC when requested", async ({
+  em,
+  factories,
+}) => {
+  em.persist([
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "C" }),
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "A" }),
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "B" }),
+  ]);
+  await em.flush();
+
+  const result = await resolver.mediaItems(
+    makeCoreContext(em),
+    25,
+    0,
+    null,
+    null,
+    MediaItemOrderField.enum.title,
+    OrderDirection.enum.ASC,
+  );
+
+  expect(result.map((m) => m.title)).toEqual(["A", "B", "C"]);
+});
+
+it("mediaItems orders by title DESC when requested", async ({
+  em,
+  factories,
+}) => {
+  em.persist([
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "A" }),
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "B" }),
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "C" }),
+  ]);
+  await em.flush();
+
+  const result = await resolver.mediaItems(
+    makeCoreContext(em),
+    25,
+    0,
+    null,
+    null,
+    MediaItemOrderField.enum.title,
+    OrderDirection.enum.DESC,
+  );
+
+  expect(result.map((m) => m.title)).toEqual(["C", "B", "A"]);
+});
+
+it("mediaItems defaults to ASC when orderBy is set without a direction", async ({
+  em,
+  factories,
+}) => {
+  em.persist([
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "B" }),
+    factories.movieFactory.makeOne({ ...requiredMovieDefaults(), title: "A" }),
+  ]);
+  await em.flush();
+
+  const result = await resolver.mediaItems(
+    makeCoreContext(em),
+    25,
+    0,
+    null,
+    null,
+    MediaItemOrderField.enum.title,
+    null,
+  );
+
+  expect(result.map((m) => m.title)).toEqual(["A", "B"]);
+});
+
+it("mediaItems ignores orderDirection when orderBy is null", async ({
+  em,
+  factories,
+}) => {
+  // Caller passing a direction without a field should not produce SQL noise.
+  // We can't assert the emitted SQL directly here, but we can assert that the
+  // call resolves and returns the expected rows.
+  em.persist([
+    factories.movieFactory.makeOne({
+      ...requiredMovieDefaults(),
+      title: "Only",
+    }),
+  ]);
+  await em.flush();
+
+  const result = await resolver.mediaItems(
+    makeCoreContext(em),
+    25,
+    0,
+    null,
+    null,
+    null,
+    OrderDirection.enum.DESC,
+  );
+
+  expect(result).toHaveLength(1);
 });
