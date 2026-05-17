@@ -22,12 +22,12 @@ type RegisteredPluginEntry =
 /** Hard upper bound on `jobs(limit)` — mirrors `MAX_MEDIA_ITEMS_LIMIT` in media-item.resolver.ts. */
 const MAX_JOBS_LIMIT = 100;
 
-/** Default page size when callers omit `limit`. Matches the dashboard's request. */
+/** Default page size when callers omit `limit`. */
 const DEFAULT_JOBS_LIMIT = 50;
 
 // The registry does not currently track:
-//   - a timestamp for `invalid` failures (we use the query-resolve time so the
-//     dashboard has something monotonically increasing to sort on)
+//   - a timestamp for `invalid` failures (we use the query-resolve time so
+//     clients have something monotonically increasing to sort on)
 //   - hydrated plugin settings (only the Zod `settingsSchema` is on `config`)
 // Both gaps are intentional and surfaced as `null` rather than fabricated.
 function projectPlugin(registered: RegisteredPluginEntry): Plugin {
@@ -106,7 +106,7 @@ export class AdminResolver {
 
   @Query(() => QueueJobsPage, {
     description:
-      "Paginated job list for a single queue, optionally filtered by lifecycle state. Returns `{ edges: [], total: 0 }` when the named queue is not registered (rather than throwing) so the dashboard can recover gracefully.",
+      "Paginated job list for a single queue, optionally filtered by lifecycle state. Returns `{ edges: [], total: 0 }` when the named queue is not registered (rather than throwing) so callers can recover gracefully.",
   })
   async jobs(
     @AdminContext() admin: AdminContext,
@@ -129,8 +129,8 @@ export class AdminResolver {
     );
     const clampedOffset = Math.max(0, Math.trunc(offset));
 
-    // No status filter -> use the four primary buckets the enum exposes; this
-    // mirrors what the dashboard's status tabs paginate over.
+    // No status filter -> use the four primary buckets the enum exposes,
+    // matching the lifecycle states callers typically tab through.
     const types: JobType[] = status
       ? [status]
       : ["waiting", "active", "completed", "failed"];

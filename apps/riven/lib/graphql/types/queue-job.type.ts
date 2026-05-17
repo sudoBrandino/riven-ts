@@ -3,7 +3,7 @@ import { Field, Float, ID, Int, ObjectType } from "type-graphql";
 
 @ObjectType({
   description:
-    "A single BullMQ job projected for the admin dashboard. Timestamps are unix-ms floats to match BullMQ's `Job` shape and avoid Int32 overflow.",
+    "A single BullMQ job projected for the admin query surface. Timestamps are unix-ms floats to match BullMQ's `Job` shape and avoid Int32 overflow.",
 })
 export class QueueJob {
   @Field(() => ID)
@@ -12,9 +12,9 @@ export class QueueJob {
   @Field(() => String)
   name!: string;
 
-  // BullMQ stores `job.data` as user-defined opaque payload; surfacing as
-  // nullable JSON because the dashboard tolerates `null` and some producers
-  // enqueue jobs with no payload.
+  // BullMQ stores `job.data` as a user-defined opaque payload. Surface as
+  // nullable JSON so callers can distinguish a real `null` payload from one
+  // that was simply never set.
   @Field(() => JSONObjectResolver, { nullable: true })
   data!: Record<string, unknown> | null;
 

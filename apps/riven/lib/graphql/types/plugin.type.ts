@@ -10,7 +10,7 @@ export class PluginLastError {
   message!: string;
 
   // Float (not Int) because we surface a unix-ms timestamp; Int would overflow
-  // GraphQL's 32-bit signed bound. Matches the dashboard's `number` typing.
+  // GraphQL's 32-bit signed bound.
   @Field(() => Float, {
     description: "Unix epoch milliseconds.",
   })
@@ -33,7 +33,7 @@ export class Plugin {
 
   @Field(() => String, {
     description:
-      "Registry-reported status discriminator (e.g. `registered`, `valid`, `invalid`). The dashboard treats unknown values as opaque strings.",
+      "Registry-reported status discriminator (e.g. `registered`, `valid`, `invalid`). Callers should treat unknown values as opaque strings.",
   })
   status!: string;
 
@@ -46,10 +46,10 @@ export class Plugin {
   })
   capabilities!: string[];
 
-  // The registry doesn't expose hydrated settings here — `RivenPlugin.config`
-  // only carries the Zod schema, not user-applied values. Surfaced as nullable
-  // JSON so the dashboard can render a placeholder until the settings service
-  // is wired through.
+  // The registry doesn't expose hydrated settings here. `RivenPlugin.config`
+  // only carries the Zod schema, not user-applied values. Surfaced as
+  // nullable JSON so callers can render a placeholder until the settings
+  // service is wired through.
   @Field(() => JSONObjectResolver, { nullable: true })
   settings!: Record<string, unknown> | null;
 }
