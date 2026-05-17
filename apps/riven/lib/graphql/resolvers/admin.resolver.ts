@@ -147,11 +147,14 @@ export class AdminResolver {
       // BullMQ's Job.id is `string | undefined`; we surface `""` for the rare
       // undefined case so the GraphQL `ID` scalar (non-null string) is happy.
       const id = job.id ?? "";
-      // BullMQ's `failedReason` is typed as `string` but is only meaningful
-      // for failed jobs; coerce empty strings to null so the dashboard can
-      // distinguish "no failure" from "empty failure message".
+      // BullMQ types `failedReason` as `string`, but at runtime it is only
+      // set on failure (Job.moveToFailed assigns `err?.message`, which can be
+      // undefined). Treat both undefined and empty string as "no failure" so
+      // consumers can distinguish that from a real, empty failure message.
       const failedReason =
-        job.failedReason.length > 0 ? job.failedReason : null;
+        job.failedReason && job.failedReason.length > 0
+          ? job.failedReason
+          : null;
       const data = job.data as Record<string, unknown> | null;
       const node: QueueJob = {
         id,
