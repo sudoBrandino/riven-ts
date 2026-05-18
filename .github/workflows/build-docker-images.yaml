@@ -6,6 +6,7 @@ on:
   push:
     branches:
       - main
+      - bw-prod
   pull_request:
     branches:
       - main
