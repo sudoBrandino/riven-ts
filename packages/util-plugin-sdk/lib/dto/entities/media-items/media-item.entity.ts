@@ -139,6 +139,14 @@ export abstract class MediaItem {
   @Property()
   failedScrapeAttempts: Opt<number> = 0;
 
+  @Field(() => String, { nullable: true })
+  @Property({
+    type: "text",
+    nullable: true,
+    check: `"download_kind" in ('torrent', 'nzb')`,
+  })
+  downloadKind?: "torrent" | "nzb" | null;
+
   @Field(() => [FileSystemEntry])
   @ManyToMany()
   filesystemEntries: Collection<FileSystemEntry> =
