@@ -1,4 +1,8 @@
-import { ShowLikeMediaItem, Stream } from "@repo/util-plugin-sdk/dto/entities";
+import {
+  Season,
+  ShowLikeMediaItem,
+  Stream,
+} from "@repo/util-plugin-sdk/dto/entities";
 import {
   GarbageTorrentError,
   RTN,
@@ -12,6 +16,7 @@ import { logger } from "../../../../../../../utilities/logger/logger.ts";
 import { settings } from "../../../../../../../utilities/settings.ts";
 import { SkippedTorrentError } from "../../../../../../sandboxed-jobs/jobs/parse-scrape-results/utilities/validate-torrent.ts";
 import { rankStreamsProcessorSchema } from "./rank-streams.schema.ts";
+import { preferSeasonPackStreams } from "./utilities/prefer-season-pack-streams.ts";
 import { sortByRankAndResolution } from "./utilities/sort-by-rank-and-resolution.ts";
 
 export const rankStreamsProcessor = rankStreamsProcessorSchema.implementAsync(
@@ -84,6 +89,13 @@ export const rankStreamsProcessor = rankStreamsProcessorSchema.implementAsync(
     const sortedTorrentsByResolution = bucketedTorrents.sort(
       sortByRankAndResolution,
     );
+
+    // Only seasons meant to be grabbed as a pack reach this processor (airing
+    // and special seasons fan out to episodes earlier), so for any season we
+    // prefer a full-season pack, falling back to the ranked list if none exist.
+    if (item instanceof Season) {
+      return preferSeasonPackStreams(sortedTorrentsByResolution, item.number);
+    }
 
     return sortedTorrentsByResolution;
   },
