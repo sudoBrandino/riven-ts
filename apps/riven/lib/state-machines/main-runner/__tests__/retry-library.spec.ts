@@ -111,21 +111,23 @@ it('enqueues a media item processor job in the "scrape" step for each partially 
 
   await waitFor(actor, (state) => state.matches("Running"));
 
+  // Shows always fan out to their seasons, so each partially completed show is
+  // reprocessed via per-season scrape jobs rather than a single show-level job.
   for (const { show } of partiallyCompletedShows) {
+    const seasons = await show.seasons.load();
+    const seasonIds = new Set<string>(seasons.map((season) => season.id));
+
     await vi.waitFor(() => {
-      expect(flowSpy).toHaveBeenCalledWith(
-        expect.arrayContaining([
-          expect.objectContaining({
-            queueName: "process-media-item",
-            data: expect.objectContaining({
-              mediaItem: expect.objectContaining({
-                id: show.id,
-              }),
-              step: "scrape",
-            }),
-          }),
-        ]),
+      const enqueuedJobs = flowSpy.mock.calls.flatMap(([jobs]) => jobs) as {
+        data: { step: string; mediaItem: { id: string } };
+      }[];
+
+      const hasSeasonScrapeJob = enqueuedJobs.some(
+        (job) =>
+          job.data.step === "scrape" && seasonIds.has(job.data.mediaItem.id),
       );
+
+      expect(hasSeasonScrapeJob).toBe(true);
     });
   }
 });

@@ -230,7 +230,7 @@ it("adds a job to reprocess the movie if the item is a movie", async ({
   });
 });
 
-it("adds a job to reprocess the lowest common denominator in the item's hierarchy if the item is show-like", async ({
+it("fans a show-like item out to its seasons for reprocessing when a stream link dies", async ({
   completedShowContext: { completedShow },
   createPluginWorker,
   createFlowWorker,
@@ -258,6 +258,9 @@ it("adds a job to reprocess the lowest common denominator in the item's hierarch
 
   expect.assert(activeStream);
 
+  const seasons = await completedShow.seasons.load();
+  const seasonIds = new Set<string>(seasons.map((season) => season.id));
+
   const { job } = await enqueueRequestStreamLink({
     mediaEntryId: mediaEntry.id,
     mediaItemTitle: mediaEntry.mediaItem.unwrap().fullTitle,
@@ -268,17 +271,16 @@ it("adds a job to reprocess the lowest common denominator in the item's hierarch
 
     expect(await job.getState()).toBe("failed");
 
-    expect(flowAddSpy).toHaveBeenCalledWith([
-      expect.objectContaining({
-        data: expect.objectContaining({
-          isRootItem: true,
-          mediaItem: expect.objectContaining({
-            id: completedShow.id,
-          }),
-          step: "scrape",
-        }),
-        queueName: "process-media-item",
-      }),
-    ]);
+    const enqueuedJobs = flowAddSpy.mock.calls.flatMap(([jobs]) => jobs) as {
+      data: { step: string; mediaItem: { id: string } };
+    }[];
+
+    const hasSeasonScrapeJob = enqueuedJobs.some(
+      (enqueuedJob) =>
+        enqueuedJob.data.step === "scrape" &&
+        seasonIds.has(enqueuedJob.data.mediaItem.id),
+    );
+
+    expect(hasSeasonScrapeJob).toBe(true);
   }, 2000);
 });
