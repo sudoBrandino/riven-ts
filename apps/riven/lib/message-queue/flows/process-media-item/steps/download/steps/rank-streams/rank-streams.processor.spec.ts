@@ -257,3 +257,58 @@ it("handles foreign language shows with aliases correctly", async ({
     }),
   ]);
 });
+
+it("prefers a season pack over a higher-resolution single episode for a season", async ({
+  createMockJob,
+  season,
+  streams,
+  mockSentryScope,
+  services,
+}) => {
+  expect.assert(streams[0]);
+  expect.assert(streams[1]);
+
+  season.number = 1;
+  const show = await season.getShow();
+
+  const packTitle = `${show.title} S01 1080p`;
+  const episodeTitle = `${show.title} S01E01 2160p`;
+
+  const job = await createMockJob({
+    id: season.id,
+    streams: {
+      [streams[0].infoHash]: episodeTitle,
+      [streams[1].infoHash]: packTitle,
+    },
+    rtnSettings: createSettings(),
+    rtnRankingModel: defaultRankingModel,
+  });
+
+  const result = await rankStreamsProcessor(
+    {
+      job,
+      scope: mockSentryScope,
+    },
+    {
+      sendEvent: vi.fn(),
+      services,
+      plugins: new Map(),
+    },
+  );
+
+  // The season pack is kept and the higher-resolution episode is dropped.
+  expect(result).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        data: expect.objectContaining({ rawTitle: packTitle }),
+      }),
+    ]),
+  );
+  expect(result).toEqual(
+    expect.not.arrayContaining([
+      expect.objectContaining({
+        data: expect.objectContaining({ rawTitle: episodeTitle }),
+      }),
+    ]),
+  );
+});

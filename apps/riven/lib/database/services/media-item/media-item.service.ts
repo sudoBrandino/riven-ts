@@ -1,4 +1,4 @@
-import { MediaItem } from "@repo/util-plugin-sdk/dto/entities";
+import { MediaItem, Season } from "@repo/util-plugin-sdk/dto/entities";
 
 import {
   CreateRequestContext,
@@ -7,6 +7,7 @@ import {
 
 import { services } from "../../database.ts";
 import { BaseService } from "../core/base-service.ts";
+import { isSeasonComplete } from "./utilities/is-season-complete.ts";
 import { resetMediaItem } from "./utilities/reset-media-item.ts";
 import { shouldFanOutForProcessing } from "./utilities/should-fan-out-for-processing.ts";
 
@@ -41,12 +42,28 @@ export class MediaItemService extends BaseService {
 
       const { settings } = await import("../../../utilities/settings.ts");
 
+      let seasonComplete = false;
+
+      if (item instanceof Season) {
+        const show = await item.getShow();
+        const standardSeasons = await show.getStandardSeasons();
+        const latestSeasonNumber = standardSeasons.length
+          ? Math.max(...standardSeasons.map((season) => season.number))
+          : item.number;
+
+        seasonComplete = isSeasonComplete({
+          seasonNumber: item.number,
+          showStatus: show.status,
+          latestSeasonNumber,
+        });
+      }
+
       if (
         shouldFanOutForProcessing({
           item,
           isPartialRequest: item.itemRequest.getProperty("isPartialRequest"),
-          downloadStrategy: settings.downloadStrategy,
           preferSeasonPacks: settings.preferSeasonPacks,
+          isSeasonComplete: seasonComplete,
         })
       ) {
         return await services.downloaderService.getFanOutDownloadItems(id);
